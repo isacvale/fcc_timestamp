@@ -17,6 +17,7 @@ app.get("/", function(request, response) {
   response.send('naah');
 });
 
-app.listen(8000, () =>
+app.listen(
+  process.env.PORT ? process.env.PORT : 8000, () =>
   console.log('alive@8000')
 )
