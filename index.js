@@ -1,5 +1,8 @@
 const express = require('express')
 const app = express()
+const cors = require('cors')
+
+app.use(cors())
 
 app.get('/api/timestamp/:date_string?', (req, res) => {
   const date = req.params.date_string
@@ -21,5 +24,5 @@ app.get("/", function(request, response) {
 
 app.listen(
   process.env.PORT ? process.env.PORT : 8000, () =>
-  console.log('alive@8000')
+  console.log(`alive@${process.env.PORT ? process.env.PORT : 8000}`)
 )
