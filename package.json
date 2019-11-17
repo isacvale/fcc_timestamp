@@ -1,0 +1,14 @@
+{
+  "name": "timestamp",
+  "version": "0.0.1",
+  "description": "A simple timestamp for fcc.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
