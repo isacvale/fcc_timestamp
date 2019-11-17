@@ -5,6 +5,7 @@ const cors = require('cors')
 app.use(cors())
 
 app.get('/api/timestamp/:date_string?', (req, res) => {
+  console.log('input:', req.params.date_string)
   const date = req.params.date_string
     ? isNaN(+req.params.date_string)
       ? new Date(req.params.date_string)
