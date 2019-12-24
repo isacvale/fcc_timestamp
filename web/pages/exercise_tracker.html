@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Exercise tracker</title>
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+  <h1>Exercise tracker</h1>
+
+  <form action="/api/exercise/new-user" method="post">
+    <h2>Add new user</h2>
+    <label>
+      Username: <input type="text" name="username" />
+    </label>
+    <input type="submit" />
+  </form>
+
+  <form action="/api/exercise/add" method="post">
+    <h2>Add exercise</h2>
+    <div>
+      <label>
+        User id: <input type="text" name="userId" />
+      </label>
+      <label>
+        Description: <input type="text" name="description" />
+      </label>
+      <label>
+        Duration: <input type="number" name="duration" /> minutes
+      </label>
+      <label>
+        Date (optional): <input type="date" name="date" />
+      </label>
+      <input type="submit" />
+    </div>
+  </form>
+
+  <form action="/api/exercise/log.html" method="get">
+    <h2>Log exercises</h2>
+    <label>
+      User id: <input type="text" name="userId" />
+    </label>
+    <label>
+      From: (optional) <input type="date" name="dateFrom" />
+    </label>
+    <label>
+      To: (optional) <input type="date" name="dateTo" />
+    </label>
+    <label>
+      Limit: (optional) <input type="number" name="limit" />
+    </label>
+    <input type="submit">
+  </form>
+</body>
+</html>
