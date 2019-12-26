@@ -122,19 +122,20 @@ const exerciseSchema = new mongoose.Schema({
   description: String,
   duration: Number,
   date: Date,
-  creationTime: Date
+  // creationTime: Date,
+  // userId: String
 })
 const personSchema = new mongoose.Schema({
-  name: String,
-  userId: String,
+  username: String,
+  // userId: String,
   exercises: [exerciseSchema],
-  creationTime: Date
+  // creationTime: Date
 })
 
 const personModel = mongoose.model('personModel', personSchema)
 const exerciseModel = mongoose.model('exerciseModel', exerciseSchema)
 
-// Homebase: send ui page
+// Homebase: serve ui page
 app.get('/api/exercise/', (req, res) =>
   res.sendFile(process.cwd()+'/web/pages/exercise_tracker.html')
 )
@@ -147,15 +148,34 @@ app.post('/api/exercise/new-user', (req, res) => { //res.send('adds new user {us
   const { username } = body
 
   const newPerson = ({
-    name: username,
+    username,
     exercises: [],
-    userId: replaceAll(uuid(), '-', ''),
-    creationTime: new Date()
+    // userId: replaceAll(uuid(), '-', ''),
+    // creationTime: new Date()
   })
 
   const entry = new personModel(newPerson)
-  entry.save()
-  res.json(newPerson)
+  const output = {
+    username,
+    _id: entry._id,
+  }
+  entry.save(err => {
+    if (err) res.send('Oh, no! It failed... would you try again?')
+    res.json(output)
+  })
+})
+
+// Retrieve all users
+app.get('/api/exercise/users', async (req, res) => {
+  personModel.find({}, (err, users) => {
+    if (err) res.send('Request failed: ' + err)
+    
+    const output = users.map(user => ({
+      username: user.username,
+      _id: user._id
+    }))
+    res.json(output)
+  })
 })
 
 // Adds a new exercise to a person
@@ -163,180 +183,81 @@ app.post('/api/exercise/add', async (req, res) => { // res.send('ads new exercis
   const { body } = req
   const { userId, duration, date, description } = body
 
-  personModel.findOne({ userId: userId }, async (err, person) => {
-    if (err) console.log('error:', err)
+  personModel.findOne({ _id: userId }, async (err, person) => {
+    if (err) res.send('Failed request:' + err)
     person.exercises = [
       ...person.exercises,
       {
         description,
-        date: date || new Date(),
         duration,
-        creationTime: new Date()
+        date: date || new Date()
       }
     ]
-    person.save( err => err
-      ? console.log(err)
-      : console.log('save successful')
-    )
-    res.json(person)
+    person.save( (err, data) => {
+      if (err) res.send('Failed request: ' + err)
+      res.json(person)
+    })
   })
 })
 
-// http://localhost:5000/api/exercise/log?userId=c2e6ea73acac4a78b8b9206dfb356182
-// http://localhost:5000/api/exercise/log/:userId/:dateFrom?/:dateTo?/:limit?'
-
-getISODate = dateString => new Date(dateString)//.toISOString()
-
 // Logs a person's exercise list with optional filters
-app.get('/api/exercise/log', (req, res) => {
+app.get('/api/exercise/log', async (req, res) => {
 
   const { query } = req
-  let { userId, dateFrom, dateTo, limit } = query
+  let { userId, from, to, limit } = query
+  limit = limit ? parseInt(limit) : null
 
-  dateFrom = '2012-03-05'
-  dateTo = '2022-03-05'
-  limit = 0
+  console.log('query', query)
 
-  let filterMatch = { $match: { userId } }
-  if (dateFrom)
-    safeAppend2(filterMatch, ['$match', 'exercises.date', '$gte', new Date(dateFrom)])
-  if (dateTo)
-    safeAppend2(filterMatch, ['$match', 'exercises.date', '$lte', new Date(dateTo)])
-
-console.debug('lim', limit)
-
-  personModel.aggregate(
-    [
-      filterMatch,
-      limit ? { $limit: +limit } : null
-    ].filter(Boolean),
-    function (err, data) {
-      if (err)
-        console.debug('err', err)
-      else {
-        let resData
-        if (data.length) { // there's a match
-          resData = {
-            userId: data[0].userId,
-            name: data[0].name,
-            count: data[0].exercises ? data[0].exercises.length : 0,
-            log: data[0].exercises.map(item => ({
-              description: item.description,
-              duration: item.duration,
-              date: item.date
-            }))
-          }
-        }
-        res.json(resData)
+  const getPlainUser = async () => 
+    personModel.aggregate(
+      [{ $match: { _id: mongoose.Types.ObjectId(userId) } }],
+      (err, data) => {
+        if (err) return (err)
+        return data
       }
-    }
-  )
+    )
+  
+  const getFullData = async () =>
+    personModel.aggregate(
+      [
+        { $match: { _id: mongoose.Types.ObjectId(userId) } },
+        { $unwind: '$exercises'},
+        from || to
+          ? {
+            $match: {
+              'exercises.date': {
+                ...(from ? { $gte: new Date(from) } : null),
+                ...(to ? { $lte: new Date(to) } : null),
+              }
+            }
+          }
+          : null,
+        limit ? { $limit: limit } : null
+      ].filter(Boolean),
+      (err, data) => {
+        if (err) return err
+        return data
+      }
+    )
+  
+  Promise.all([getPlainUser(), getFullData()])
+    .then(data => res.json(beautifyResults(data)))
+  
+  const beautifyResults = data => ({
+    username: data[0][0].username,
+    _id: data[0][0]._id,
+    exercises: data[1].length
+      ? data[1]
+        .map(entry => entry.exercises)
+        .map(exercise => ({
+          description: exercise.description,
+          duration: exercise.duration,
+          date: exercise.date
+        }))
+      : []
+  })
 })
-
-
-
-// // Logs a person's exercise list with optional filters
-// app.get('/api/exercise/log', (req, res) => { // res.send('gets list of exercise, gets user obj + exercises + exercise count'))
-// // app.get('/api/exercise/log/:userId/:dateFrom?/:dateTo?/:limit?', (req, res) => { // res.send('gets list of exercise, gets user obj + exercises + exercise count'))
-//   // res.json(req.query)
-
-//   const { query } = req
-//   let { userId, dateFrom, dateTo, limit } = query
-
-//   // const filters =  { userId }
-//   // if (dateFrom || dateTo) filters.exercises = {}
-//   // if (dateFrom && dateTo) filters.exercises.date = {$gte: getISODate(dateFrom), $lte: getISODate(dateTo)}
-//   // else if (dateFrom) filters.exercises.date = {$gte: getISODate(dateFrom)}
-//   // else if (dateTo) filters.exercises.date = {$lte: getISODate(dateTo)}
-
-//   // console.log('query:', query)
-//   // console.log('filters:', filters)
-//   // res.json({query: query, filters: filters})
-
-//   dateFrom = '2012-03-05'
-//   dateTo = '2022-03-05'
-
-//   let filterMatch = { $match: { userId } }
-//   if (dateFrom)
-//     safeAppend2(filterMatch, ['$match', 'exercises.date', '$gte', getISODate(dateFrom)])
-//   console.debug('filters 1', filterMatch)
-//   if (dateTo)
-//     safeAppend2(filterMatch, ['$match', 'exercises.date', '$lte', getISODate(dateTo)])
-
-//   console.debug('filters 2', filterMatch)
-//   // res.json(filterMatch)
-//   personModel.aggregate([
-//       filterMatch
-//     ], function (err, res) {
-//       if (err) console.debug('err', err)
-//       else
-//       // console.log('res', res)
-//       res.json(res || [err])
-//     })
-// })
-
-
-safeAppend = (obj, argList, curObj) => {
-  if (argList.length) {
-    const newList = [...argList]
-    const lastItem = newList.pop()
-    console.log('pop', lastItem)
-    if (!curObj)
-      return safeAppend(obj, newList, lastItem)
-    else
-      return safeAppend(obj, newList, {[lastItem]: curObj})
-  }
-  return { ...obj, ...curObj}
-}
-
-safeAppend2 = (obj, argList) => {
-  argList.reduce(safePathReducer, obj)
-  // const newargList = [...argList]
-  // let curObj = obj
-  // let newItem
-  // let oldItem
-  // let oldObj
-
-  // while (newargList.length > 1) {
-  //   oldItem = newItem
-  //   newItem = newargList.shift()
-
-  //   if (!curObj[newItem]) curObj[newItem] = {}
-
-  //   oldObj = curObj
-  //   curObj = curObj[newItem]
-  // }
-
-  // oldObj[newItem] = newargList[0]
-}
-
-safePathReducer = (acc, cur, idx, arr) => {
-  guardAddProp = (obj, prop) => obj[prop] ? null : obj[prop] = {}
-
-  // If first loop: set up rich accumulator
-  if (idx === 0) {
-    guardAddProp(acc, cur)
-    return { obj: acc, ref: [acc, cur] }
-  }
-
-  // Other loops
-  else {
-    const refObj = acc.ref[0]
-    const refProp = acc.ref[1]
-
-    // Regular loops
-    if (idx < arr.length - 1) {
-      guardAddProp(refObj[refProp], cur)
-      return { obj: acc.obj, ref: [refObj[refProp], cur] }
-    }
-
-    // Last loop
-    else {
-      refObj[refProp] = cur
-      return acc.obj
-    }
-  }
-}
 
 /*
  Default home
