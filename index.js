@@ -1,6 +1,8 @@
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
+const multer = require('multer')
+const upload = multer({ dest: process.cwd() + '/uploads' })
 const dns = require('dns')
 const mongoose = require('mongoose')
 const uuid = require('uuid/v4')
@@ -259,6 +261,24 @@ app.get('/api/exercise/log', async (req, res) => {
   })
 })
 
+/*
+Metadata microservice
+****************************************************************/
+app.get('/api/metadata/', function (request, response) {
+  response.sendFile(process.cwd() + '/web/pages/metadata.html')
+})
+
+app.post('/api/metadata/fileanalyse', upload.single('foo'), function (req, res) {
+  if (req.file) {
+    const output = {
+      name: req.file.originalname,
+      type: req.file.mimetype,
+      size: req.file.size
+    }
+    res.json(output)
+  }
+  res.end('oh no')
+})
 /*
  Default home
  ***************************************************************/
